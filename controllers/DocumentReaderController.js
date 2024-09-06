@@ -1,59 +1,104 @@
+const { ObjectId } = require('mongodb'); 
+const { connectToDatabase } = require('../db');
+const fileType = require('file-type');
 const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
-const xlsx = require('xlsx');
+const XLSX = require('xlsx');
 
-// Function to extract content from different file types
 const extractFileContent = async (file) => {
-    const fileBuffer = file.buffer;
-    const fileType = file.mimetype;
+    const fileTypeResult = await fileType.fromBuffer(file.buffer);
 
-    try {
-        if (fileType === 'application/pdf') {
-            const pdfData = await pdfParse(fileBuffer);
-            return pdfData.text;  // Extract text from PDF
+    if (fileTypeResult) {
+        const ext = fileTypeResult.ext;
 
-        } else if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-            const docxData = await mammoth.extractRawText({ buffer: fileBuffer });
-            return docxData.value;  // Extract text from DOCX
-
-        } else if (fileType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-                   fileType === 'application/vnd.ms-excel') {
-            const workbook = xlsx.read(fileBuffer, { type: 'buffer' });
+        if (ext === 'pdf') {
+            return pdfParse(file.buffer).then(data => data.text);
+        } else if (ext === 'docx') {
+            const result = await mammoth.extractRawText({ buffer: file.buffer });
+            return result.value;
+        } else if (ext === 'xlsx') {
+            const workbook = XLSX.read(file.buffer, { type: 'buffer' });
             let sheetData = '';
-
             workbook.SheetNames.forEach(sheetName => {
-                const sheet = workbook.Sheets[sheetName];
-                sheetData += xlsx.utils.sheet_to_csv(sheet);  // Convert sheet to CSV text
+                sheetData += XLSX.utils.sheet_to_csv(workbook.Sheets[sheetName]);
             });
-
-            return sheetData;  // Return all sheets' data as CSV
+            return sheetData;
         } else {
-            return 'Unsupported file format. Please upload PDF, DOCX, or Excel files.';
+            return file.buffer.toString('utf8'); // Handle text files and others
         }
-    } catch (error) {
-        console.error('Error extracting file content:', error);
-        throw new Error('Failed to read the uploaded document.');
+    } else {
+        return file.buffer.toString('utf8'); // Fallback for text files
     }
 };
 
-// Controller to handle file uploads and return extracted content
 const processFileUpload = async (req, res) => {
-    const file = req.file;
+    const files = req.files;
 
-    if (!file) {
-        return res.status(400).json({ error: 'No file uploaded.' });
+    if (!files || files.length === 0) {
+        return res.status(400).json({ error: 'No files uploaded' });
     }
+
+    const db = await connectToDatabase();
+    try {
+        const uploadedDocuments = [];
+        let extractedContentArray = []; // Initialize an array for extracted content
+
+        for (let file of files) {
+            const content = await extractFileContent(file); // Extract file content
+            extractedContentArray.push(content); 
+
+            const documentRecord = {
+                documentName: file.originalname,
+                documentContent: content,
+                uploadDate: new Date(),
+            };
+
+
+            const result = await db.collection('documents').insertOne(documentRecord);
+            uploadedDocuments.push(result.insertedId); // Store document ID
+        }
+
+        res.json({ success: true, documentIds: uploadedDocuments, contents: extractedContentArray });
+    } catch (error) {
+        console.error('Error uploading documents:', error);
+        res.status(500).json({ error: 'Failed to upload documents' });
+    }
+};
+
+const getUploadedDocuments = async (req, res) => {
+    const db = await connectToDatabase();
+    try {
+        const documents = await db.collection('documents').find({}, { projection: { documentName: 1, _id: 1 } }).toArray();
+        res.json({ success: true, documents });
+    } catch (error) {
+        console.error('Error fetching documents:', error);
+        res.status(500).json({ error: 'Failed to fetch documents' });
+    }
+};
+
+// Function to delete multiple documents by their IDs
+const deleteDocuments = async (req, res) => {
+    const { documentIds } = req.body;
+
+    if (!documentIds || !Array.isArray(documentIds)) {
+        return res.status(400).json({ error: 'Invalid document IDs' });
+    }
+
+    const db = await connectToDatabase();
 
     try {
-        const fileContent = await extractFileContent(file);
-        
-        // Debugging: Log the extracted content
-        console.log('Extracted Content:', fileContent);
-        
-        res.json({ content: fileContent });
+        const objectIds = documentIds.map(id => new ObjectId(id)); // Convert to ObjectId array
+        const result = await db.collection('documents').deleteMany({ _id: { $in: objectIds } });
+
+        if (result.deletedCount === 0) {
+            return res.status(404).json({ error: 'Documents not found' });
+        }
+
+        res.json({ success: true, message: `${result.deletedCount} documents deleted successfully` });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Error deleting documents:', error);
+        res.status(500).json({ error: 'Failed to delete documents' });
     }
 };
 
-module.exports = { processFileUpload };
+module.exports = { processFileUpload, getUploadedDocuments, deleteDocuments };

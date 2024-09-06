@@ -1,23 +1,27 @@
 const axios = require('axios');
+const { ObjectId } = require('mongodb'); // Required to work with MongoDB ObjectId
+const { connectToDatabase } = require('../db');
 
 // Controller to handle AI requests
 const processAIRequest = async (req, res) => {
-    const { api, prompt, documentContent } = req.body; // Extract the API selection, prompt, and document content
+    const { api, prompt, documentIds } = req.body; // Accept multiple document IDs
+
 
     try {
-        let finalPrompt = prompt;
+        const db = await connectToDatabase();
+        const documents = await db.collection('documents').find({ _id: { $in: selectedDocumentIds.map(id => new ObjectId(id)) } }).toArray();
 
-        // If document content is available, combine it with the user-provided prompt
-        if (documentContent) {
-            finalPrompt = `${documentContent}\n\n${prompt}`;
-        }
+        // Concatenate document contents
+        const concatenatedContent = documents.map(doc => doc.documentContent).join('\n\n');
+
+        // Combine the concatenated content with the prompt
+        const finalPrompt = `${concatenatedContent}\n\n${prompt}`;
 
         let response;
 
         // AI Model Selection
         if (api === 'openai') {
             console.log('Sending request to OpenAI (gpt-3.5-turbo)...');
-
             response = await axios.post('https://api.openai.com/v1/chat/completions', {
                 model: 'gpt-3.5-turbo',
                 messages: [
@@ -33,7 +37,6 @@ const processAIRequest = async (req, res) => {
 
         } else if (api === 'claude') {
             console.log('Sending request to Claude AI...');
-
             response = await axios.post('https://api.claudeai.com/v1/engines/default/completions', {
                 prompt: finalPrompt,
                 max_tokens: 100,
@@ -45,7 +48,6 @@ const processAIRequest = async (req, res) => {
 
         } else if (api === 'custom') {
             console.log('Sending request to Custom Model...');
-            // Handle custom AI model request here
             response = await axios.post('https://your-custom-model-api.com/process', {
                 prompt: finalPrompt,
                 max_tokens: 100,
@@ -60,7 +62,7 @@ const processAIRequest = async (req, res) => {
         }
 
         // Return AI response
-        res.json({ data: response.data });
+        res.json({ success: true, data: response.data });
 
     } catch (error) {
         if (error.response) {
