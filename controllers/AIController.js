@@ -4,12 +4,11 @@ const { connectToDatabase } = require('../db');
 
 // Controller to handle AI requests
 const processAIRequest = async (req, res) => {
-    const { api, prompt, documentIds } = req.body; // Accept multiple document IDs
-
+    const { api, prompt, documentIds, useFrontendApiKey, openAiApiKey, claudeApiKey } = req.body; // Accept multiple document IDs and keys
 
     try {
         const db = await connectToDatabase();
-        const documents = await db.collection('documents').find({ _id: { $in: selectedDocumentIds.map(id => new ObjectId(id)) } }).toArray();
+        const documents = await db.collection('documents').find({ _id: { $in: documentIds.map(id => new ObjectId(id)) } }).toArray();
 
         // Concatenate document contents
         const concatenatedContent = documents.map(doc => doc.documentContent).join('\n\n');
@@ -18,9 +17,12 @@ const processAIRequest = async (req, res) => {
         const finalPrompt = `${concatenatedContent}\n\n${prompt}`;
 
         let response;
+        let apiKey;
 
         // AI Model Selection
         if (api === 'openai') {
+            apiKey = useFrontendApiKey ? openAiApiKey : process.env.OPENAI_API_KEY; // Use frontend key if provided
+
             console.log('Sending request to OpenAI (gpt-3.5-turbo)...');
             response = await axios.post('https://api.openai.com/v1/chat/completions', {
                 model: 'gpt-3.5-turbo',
@@ -31,18 +33,20 @@ const processAIRequest = async (req, res) => {
                 max_tokens: 100,
             }, {
                 headers: {
-                    'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+                    'Authorization': `Bearer ${apiKey}`
                 }
             });
 
         } else if (api === 'claude') {
+            apiKey = useFrontendApiKey ? claudeApiKey : process.env.CLAUDE_API_KEY; // Use frontend key if provided
+
             console.log('Sending request to Claude AI...');
             response = await axios.post('https://api.claudeai.com/v1/engines/default/completions', {
                 prompt: finalPrompt,
                 max_tokens: 100,
             }, {
                 headers: {
-                    'Authorization': `Bearer ${process.env.CLAUDE_API_KEY}`
+                    'Authorization': `Bearer ${apiKey}`
                 }
             });
 
