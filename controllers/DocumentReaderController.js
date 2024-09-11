@@ -1,9 +1,27 @@
-const { ObjectId } = require('mongodb'); 
+const { ObjectId } = require('mongodb');
 const { connectToDatabase } = require('../db');
 const fileType = require('file-type');
 const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
 const XLSX = require('xlsx');
+const admin = require('firebase-admin');
+
+const verifyToken = async (req, res, next) => {
+    const idToken = req.headers.authorization;
+
+    if (!idToken) {
+        return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    try {
+        const decodedToken = await admin.auth().verifyIdToken(idToken);
+        req.user = decodedToken;
+        next();
+    } catch (error) {
+        console.error('Error verifying token:', error);
+        return res.status(403).json({ error: 'Unauthorized' });
+    }
+};
 
 const extractFileContent = async (file) => {
     const fileTypeResult = await fileType.fromBuffer(file.buffer);
@@ -24,15 +42,16 @@ const extractFileContent = async (file) => {
             });
             return sheetData;
         } else {
-            return file.buffer.toString('utf8'); // Handle text files and others
+            return file.buffer.toString('utf8');
         }
     } else {
-        return file.buffer.toString('utf8'); // Fallback for text files
+        return file.buffer.toString('utf8');
     }
 };
 
 const processFileUpload = async (req, res) => {
     const files = req.files;
+    const userId = req.userId; // Firebase UID from verifyToken
 
     if (!files || files.length === 0) {
         return res.status(400).json({ error: 'No files uploaded' });
@@ -41,21 +60,21 @@ const processFileUpload = async (req, res) => {
     const db = await connectToDatabase();
     try {
         const uploadedDocuments = [];
-        let extractedContentArray = []; // Initialize an array for extracted content
+        let extractedContentArray = [];
 
         for (let file of files) {
-            const content = await extractFileContent(file); // Extract file content
-            extractedContentArray.push(content); 
+            const content = await extractFileContent(file);
+            extractedContentArray.push(content);
 
             const documentRecord = {
+                userId, // Associate document with user
                 documentName: file.originalname,
                 documentContent: content,
                 uploadDate: new Date(),
             };
 
-
             const result = await db.collection('documents').insertOne(documentRecord);
-            uploadedDocuments.push(result.insertedId); // Store document ID
+            uploadedDocuments.push(result.insertedId);
         }
 
         res.json({ success: true, documentIds: uploadedDocuments, contents: extractedContentArray });
@@ -66,9 +85,11 @@ const processFileUpload = async (req, res) => {
 };
 
 const getUploadedDocuments = async (req, res) => {
+    const userId = req.userId; // Firebase UID
+
     const db = await connectToDatabase();
     try {
-        const documents = await db.collection('documents').find({}, { projection: { documentName: 1, _id: 1 } }).toArray();
+        const documents = await db.collection('documents').find({ userId }).toArray(); // Fetch only the documents of this user
         res.json({ success: true, documents });
     } catch (error) {
         console.error('Error fetching documents:', error);
@@ -76,7 +97,7 @@ const getUploadedDocuments = async (req, res) => {
     }
 };
 
-// Function to delete multiple documents by their IDs
+
 const deleteDocuments = async (req, res) => {
     const { documentIds } = req.body;
 
@@ -85,20 +106,19 @@ const deleteDocuments = async (req, res) => {
     }
 
     const db = await connectToDatabase();
-
     try {
-        const objectIds = documentIds.map(id => new ObjectId(id)); // Convert to ObjectId array
-        const result = await db.collection('documents').deleteMany({ _id: { $in: objectIds } });
+        const result = await db.collection('documents').deleteMany({ _id: { $in: documentIds.map(id => new ObjectId(id)) }, userId: req.userId });
 
         if (result.deletedCount === 0) {
-            return res.status(404).json({ error: 'Documents not found' });
+            return res.status(404).json({ error: 'Documents not found or unauthorized' });
         }
 
-        res.json({ success: true, message: `${result.deletedCount} documents deleted successfully` });
+        res.json({ success: true, message: `${result.deletedCount} documents deleted` });
     } catch (error) {
         console.error('Error deleting documents:', error);
         res.status(500).json({ error: 'Failed to delete documents' });
     }
 };
 
-module.exports = { processFileUpload, getUploadedDocuments, deleteDocuments };
+
+module.exports = { processFileUpload, getUploadedDocuments, deleteDocuments, verifyToken };

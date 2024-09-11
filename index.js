@@ -3,6 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const multer = require('multer');
 const cors = require('cors');
+const verifyToken = require('./middlewares/verifyToken');
 const { processAIRequest } = require('./controllers/AIController'); 
 const { processFileUpload } = require('./controllers/DocumentReaderController'); 
 const { getUploadedDocuments } = require('./controllers/DocumentReaderController');
@@ -43,3 +44,6 @@ app.post('/api/ai-process', processAIRequest);
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });
+
+// Protect this route
+app.post('/api/send-to-ai', verifyToken, processAIRequest);
