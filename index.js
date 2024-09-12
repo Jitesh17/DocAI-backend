@@ -3,10 +3,9 @@ require('dotenv').config();
 const express = require('express');
 const multer = require('multer');
 const cors = require('cors');
-const { processAIRequest } = require('./controllers/AIController'); 
-const { processFileUpload } = require('./controllers/DocumentReaderController'); 
-const { getUploadedDocuments } = require('./controllers/DocumentReaderController');
-const { deleteDocuments } = require('./controllers/DocumentReaderController'); 
+const verifyToken = require('./middlewares/verifyToken');
+const { processAIRequest } = require('./controllers/AIController');
+const { processFileUpload, getUploadedDocuments, deleteDocuments } = require('./controllers/DocumentReaderController'); 
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -35,11 +34,10 @@ app.get('/api/uploaded-documents', getUploadedDocuments);
 // Route to handle document deletion
 app.delete('/api/delete-documents', deleteDocuments);
 
-// Route to handle AI interactions (processing prompt + extracted document content)
-// No file upload happens here; only prompt and previously extracted content are sent.
-app.post('/api/ai-process', processAIRequest);
-
 // Start the server
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });
+
+// Protect this route
+app.post('/api/send-to-ai', verifyToken, processAIRequest);
