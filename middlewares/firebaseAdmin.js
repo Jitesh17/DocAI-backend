@@ -1,18 +1,16 @@
 const admin = require('firebase-admin');
-const fs = require('fs');
 
-const serviceAccountPath = process.env.NODE_ENV === 'production'
-  ? '/etc/secrets/serviceAccountKey.json'  // Path in Render
-  : '../secrets/serviceAccountKey.json';    // Path in local development
-
-if (fs.existsSync(serviceAccountPath)) {
-  console.log('Service account file exists');
-  const serviceAccount = require(serviceAccountPath);
+let serviceAccount;
+if (process.env.NODE_ENV === 'production') {
+  try {
+    serviceAccount = JSON.parse(process.env.SERVICE_ACCOUNT_KEY);
+    console.log('Successfully parsed SERVICE_ACCOUNT_KEY environment variable');
+  } catch (error) {
+    console.error('Error parsing SERVICE_ACCOUNT_KEY:', error);
+  }
 } else {
-  console.log('Service account file does not exist');
+  serviceAccount = require(path.join(__dirname, '../config/serviceAccountKey.json'));
 }
-
-const serviceAccount = require(serviceAccountPath);
 admin.initializeApp({
     credential: admin.credential.cert(serviceAccount)
 });
