@@ -61,4 +61,4 @@ docker/volumes/
 connect.lock
 coverage/
 typings/
-config/
+secrets/

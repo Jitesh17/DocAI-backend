@@ -1,6 +1,10 @@
 const admin = require('firebase-admin');
-const serviceAccount = require('../config/serviceAccountKey.json'); 
 
+const serviceAccountPath = process.env.NODE_ENV === 'production'
+  ? '/etc/secrets/serviceAccountKey.json'  // Path in Render
+  : '../secrets/serviceAccountKey.json';    // Path in local development
+
+const serviceAccount = require(serviceAccountPath);
 admin.initializeApp({
     credential: admin.credential.cert(serviceAccount)
 });
