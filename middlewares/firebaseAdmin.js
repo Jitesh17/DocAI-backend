@@ -9,7 +9,7 @@ if (process.env.NODE_ENV === 'production') {
     console.error('Error parsing SERVICE_ACCOUNT_KEY:', error);
   }
 } else {
-  serviceAccount = require(path.join(__dirname, '../config/serviceAccountKey.json'));
+  serviceAccount = require('../secrets/serviceAccountKey.json');
 }
 admin.initializeApp({
     credential: admin.credential.cert(serviceAccount)

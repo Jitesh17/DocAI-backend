@@ -3,8 +3,11 @@ const { ObjectId } = require('mongodb');
 const { connectToDatabase } = require('../db');
 
 const processAIRequest = async (req, res) => {
-    let { api, prompt, selectedDocumentIds, useFrontendApiKey, openAiApiKey, claudeApiKey } = req.body;
+    let { api, prompt, selectedDocumentIds, useFrontendApiKey, openAiApiKey, claudeApiKey, maxTokens } = req.body;
 
+    if (!maxTokens || typeof maxTokens !== 'number' || maxTokens <= 0) {
+        maxTokens = 100;
+    }
     if (!prompt || prompt.trim() === '') {
         prompt = 'Summarize'; 
     }
@@ -24,7 +27,7 @@ const processAIRequest = async (req, res) => {
         }
 
         const concatenatedContent = documents.map(doc => doc.documentContent).join('\n\n');
-        const finalPrompt = `${concatenatedContent}\n\n${prompt}`;
+        const finalPrompt = `${concatenatedContent}\n\n${prompt}\n\nPlease format the response in markdown.`;
         let response, apiKey;
         if (api === 'openai') {
             apiKey = useFrontendApiKey ? openAiApiKey : process.env.OPENAI_API_KEY;
@@ -36,7 +39,7 @@ const processAIRequest = async (req, res) => {
                     { role: 'system', content: 'You are a helpful assistant.' },
                     { role: 'user', content: finalPrompt }
                 ],
-                max_tokens: 100
+                max_tokens: 200
             }, {
                 headers: {
                     'Authorization': `Bearer ${apiKey}`,
