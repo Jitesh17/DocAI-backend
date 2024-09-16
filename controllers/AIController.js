@@ -1,6 +1,15 @@
 const axios = require('axios');
 const { ObjectId } = require('mongodb');
 const { connectToDatabase } = require('../db');
+const { encoding_for_model } = require('@dqbd/tiktoken');
+
+const estimateTokenCount = (text, model = 'gpt-3.5-turbo-16k') => {
+    const enc = encoding_for_model(model);
+    const tokens = enc.encode(text);
+    const tokenCount = tokens.length;
+    enc.free();
+    return tokenCount;
+};
 
 const processAIRequest = async (req, res) => {
     let { api, prompt, selectedDocumentIds, useFrontendApiKey, openAiApiKey, claudeApiKey, maxTokens } = req.body;
@@ -28,24 +37,41 @@ const processAIRequest = async (req, res) => {
 
         const concatenatedContent = documents.map(doc => doc.documentContent).join('\n\n');
         const finalPrompt = `${concatenatedContent}\n\n${prompt}\n\nPlease format the response in markdown.`;
+
         let response, apiKey;
         if (api === 'openai') {
             apiKey = useFrontendApiKey ? openAiApiKey : process.env.OPENAI_API_KEY;
-            console.log('Sending request to OpenAI (gpt-3.5-turbo)...');
+            const model = 'gpt-3.5-turbo-16k'; // Change this if using other models
+            const MAX_TOKEN_LIMITS = {
+                'gpt-3.5-turbo': 4096,
+                'gpt-3.5-turbo-16k': 16384,
+                'gpt-4': 8192, // Example for GPT-4
+            };
+
+            const inputTokens = estimateTokenCount(finalPrompt, model);
+            const bufferTokens = 100; // Adding a buffer to stay within limits
+            const maxTokenLimit = MAX_TOKEN_LIMITS[model];  
+            const availableTokens = maxTokenLimit - inputTokens - bufferTokens;                  
+
+            if (maxTokens > availableTokens) {
+                maxTokens = availableTokens;
+                console.log(`Reducing max tokens to ${maxTokens} to stay within the limit`);
+            }
+            console.log('Sending request to OpenAI (gpt-3.5-turbo-16k)...');
             
             response = await axios.post('https://api.openai.com/v1/chat/completions', {
-                model: 'gpt-3.5-turbo',
+                model: 'gpt-3.5-turbo-16k',
                 messages: [
                     { role: 'system', content: 'You are a helpful assistant.' },
                     { role: 'user', content: finalPrompt }
                 ],
-                max_tokens: 200
+                max_tokens: maxTokens
             }, {
                 headers: {
                     'Authorization': `Bearer ${apiKey}`,
                     'Content-Type': 'application/json' 
                 },
-                timeout: 10000
+                timeout: 30000
             });
         
             const messageContent = response.data.choices[0].message.content;

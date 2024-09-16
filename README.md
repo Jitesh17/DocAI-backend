@@ -1,5 +1,19 @@
 # DocAI Backend
 
+<div>
+    <!-- License Badge -->
+    <img src="https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg" alt="License: CC BY-NC 4.0"/>
+    <!-- Frontend Tech Badge -->
+    <img src="https://img.shields.io/badge/backend-Express.js-green" alt="React"/>
+    <!-- Node.js Version Badge -->
+    <img src="https://img.shields.io/badge/node-%3E%3D%2020.0.0-brightgreen" alt="Node.js Version"/>
+    <!-- PRs Welcome Badge -->
+    <img src="https://img.shields.io/github/last-commit/Jitesh17/DocAI-backend" alt="Last Commit"/>
+    <!-- GitHub Issues Badge -->
+    <img src="https://img.shields.io/github/issues/Jitesh17/DocAI-backend" alt="GitHub Issues"/>
+    <!-- PRs Welcome Badge -->
+    <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"/>
+
 This is the backend for the DocAI application, which provides API endpoints for user authentication, document processing, and AI integration. The backend is built using Node.js, Express, and MongoDB.
 
 ## Features
@@ -77,7 +91,9 @@ This project is set up to deploy automatically on Render. Follow these steps for
 
 ## License
 
-This project is licensed under the [Creative Commons Non-Commercial License](https://creativecommons.org/licenses/by-nc/4.0/). You are free to use, modify, and distribute the code for non-commercial purposes, provided that you give appropriate credit.
+This project is licensed under the Creative Commons Attribution-NonCommercial 4.0 International License. You are free to share and adapt the material as long as you give appropriate credit and do not use the material for commercial purposes.
+
+For more details, see the [LICENSE](./LICENSE) file or visit [Creative Commons License](https://creativecommons.org/licenses/by-nc/4.0/).
 
 ## Acknowledgements
 
