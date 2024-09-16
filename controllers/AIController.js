@@ -15,7 +15,7 @@ const processAIRequest = async (req, res) => {
     let { api, prompt, selectedDocumentIds, useFrontendApiKey, openAiApiKey, claudeApiKey, maxTokens } = req.body;
 
     if (!maxTokens || typeof maxTokens !== 'number' || maxTokens <= 0) {
-        maxTokens = 100;
+        maxTokens = 500;
     }
     if (!prompt || prompt.trim() === '') {
         prompt = 'Summarize'; 
